@@ -228,6 +228,8 @@ public class GyroscopeActivity extends AppCompatActivity implements SensorEventL
             // Android reuses events, so you probably want a copy
             System.arraycopy(event.values, 0, rotation, 0, event.values.length);
 
+            logText(rotation, event.timestamp);
+
             switch (mode) {
                 case GYROSCOPE_ONLY:
                     if(!orientationGyroscope.isBaseOrientationSet()) {
@@ -266,6 +268,15 @@ public class GyroscopeActivity extends AppCompatActivity implements SensorEventL
 
             dataLogger.setRotation(fusedOrientation);
         }
+    }
+
+    private void logText(float[] rotation, long timestamp) {
+
+        String strX = String.format(Locale.getDefault(),"%.1f", (Math.toDegrees(rotation[0]) + 360) % 360);
+        String strY = String.format(Locale.getDefault(),"%.1f", (Math.toDegrees(rotation[1]) + 360) % 360);
+        String strZ = String.format(Locale.getDefault(),"%.1f", (Math.toDegrees(rotation[2]) + 360) % 360);
+
+        Log.i("parse", "updateText = " + strX + " " + strY + " " + strZ + " " + timestamp);
     }
 
     @Override
