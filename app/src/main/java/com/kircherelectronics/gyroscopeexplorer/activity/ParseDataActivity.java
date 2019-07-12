@@ -21,6 +21,7 @@ import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
@@ -31,7 +32,8 @@ public class ParseDataActivity extends AppCompatActivity {
     private static final String TAG = ParseDataActivity.class.getSimpleName();
     private final static int WRITE_EXTERNAL_STORAGE_REQUEST = 1000;
 
-    private String IMU_FILE = "/sdcard/ZZZ_q8h_Area_3_1562552173878.txt";
+//    private String IMU_FILE = "/sdcard/ZZZ_q8h_Area_3_1562552173878.txt";
+    private String IMU_FILE = "/sdcard/imu_rawdata_3";
     private FileInputStream is;
     private BufferedReader reader;
     private BufferedInputStream inputStream;
@@ -87,8 +89,13 @@ public class ParseDataActivity extends AppCompatActivity {
                 new Thread(new Runnable() {
                     @Override
                     public void run() {
+                        //parse Q8H data
+                        IMU_FILE = "/sdcard/ZZZ_q8h_Area_3_1562552173878.txt";
                         getTimeInverval(IMU_FILE);
                         parseFile(IMU_FILE);
+
+
+//                        parseRawData(IMU_FILE);
                     }
                 }).start();
 
@@ -155,6 +162,50 @@ public class ParseDataActivity extends AppCompatActivity {
 //        for (Float i : timeDiff) {
 //            Log.i(TAG, "" + i);
 //        }
+    }
+
+    private void parseRawData(String filename) {
+        float to_rps = 0.0174532925f;
+        float sensitivity = 0.00875f;
+        FileReader fr = null;
+        BufferedReader br = null;
+        long base_timestamp = 0;
+        int imu_count = 0;
+
+        try {
+            fr = new FileReader(filename);
+            br = new BufferedReader(fr);
+            String line = br.readLine().replace("\n", "").replace(" ", ""); //readLine()讀取一整行
+            while (line != null || !line.equals("")){
+//                Log.i(TAG, line);
+                String[] items = line.split(",");
+                float[] gyro = new float[3];
+                gyro[0] = Integer.valueOf(items[0]) * sensitivity * to_rps;
+                gyro[1] = Integer.valueOf(items[1]) * sensitivity * to_rps;
+                gyro[2] = Integer.valueOf(items[2]) * sensitivity * to_rps;
+//                Log.i(TAG, "" + gyro[0] + " " + gyro[1] + " " + gyro[2]);
+
+                long measured_ts = base_timestamp + (long)((long)imu_count*10000000L);
+
+                getOrientation(gyro, measured_ts);
+                logText(fusedOrientation, measured_ts);
+
+                imu_count++;
+
+                line = br.readLine().replace("\n", "").replace(" ", "");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                if (br != null) {
+                    br.close();
+                }
+            } catch (IOException ignored) {
+            }
+        }
+
+
     }
 
     private void parseFile(String filename) {
