@@ -40,11 +40,14 @@ public class ParseDataActivity extends AppCompatActivity {
 
 //    private String IMU_FILE = "/sdcard/ZZZ_q8h_Area_3_1562552173878.txt";
     private String IMU_FILE = "/sdcard/imu_rawdata_3";
+    private String timestampFilePath = "";
+    private String imuFilePath = "";
     private FileInputStream is;
     private BufferedReader reader;
     private BufferedInputStream inputStream;
     private long baseTimestamp;
     private List<Float> timeDiff = new ArrayList<Float>();
+    private List<Long> timestampList = new ArrayList<Long>();
 
     private Button parseBtn;
     private TextView filepathView;
@@ -77,7 +80,7 @@ public class ParseDataActivity extends AppCompatActivity {
         RAW_INT
     }
     private Mode mode = Mode.GYROSCOPE_ONLY;
-    private Rate rate = Rate.RATE2;
+    private Rate rate = Rate.RATE1;
     private DeviceType deviceType = DeviceType.INSULIN;
     private DataType dataType = DataType.RAW_HEX;
 
@@ -180,6 +183,20 @@ public class ParseDataActivity extends AppCompatActivity {
                 intent.setType("*/*");
                 startActivityForResult(intent, FILE_CHOOSE_CODE);
                 break;
+
+            case R.id.parse_mp4_btn:
+                if (pathHolder.contains(".mp4")) {
+                    //read ts file
+                    timestampFilePath = "/sdcard/" + pathHolder.split(":")[1];
+                    timestampFilePath = timestampFilePath.replace(".mp4", ".ts");
+                    readTimestamp(timestampFilePath);
+                    Log.i(TAG, "timestamp from " + timestampList.get(0) + " to " + timestampList.get(timestampList.size()-1) + "; length = " + timestampList.size());
+
+                    imuFilePath = "/sdcard/" + pathHolder.split(":")[1];
+                    imuFilePath = imuFilePath.replace(".mp4", ".txt");
+                    createIMUAndTSFile(imuFilePath);
+                }
+                break;
         }
     }
 
@@ -194,6 +211,40 @@ public class ParseDataActivity extends AppCompatActivity {
             case KALMAN_FILTER:
                 orientationKalmanFusion.reset();
                 break;
+        }
+    }
+
+    private void readTimestamp(String filename) {
+        File f = new File(filename);
+        if (!f.exists()) {
+            Log.e(TAG, "file not exist: " + filename);
+            return;
+        }
+        timestampList.clear();
+        FileReader fr = null;
+        BufferedReader br = null;
+
+        try {
+            fr = new FileReader(filename);
+            br = new BufferedReader(fr);
+            String line = br.readLine().replace("\n", "").replace(" ", "");
+            while (line != null && !line.equals("")){
+                timestampList.add(Long.parseLong(line));
+
+                line = br.readLine();
+                if (null != line)
+                    line = line.replace("\n", "").replace(" ", "");
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                if (br != null) {
+                    br.close();
+                }
+            } catch (IOException ignored) {
+            }
         }
     }
 
@@ -213,7 +264,7 @@ public class ParseDataActivity extends AppCompatActivity {
                         tv_sec = (bytes[7] & 0xFF) << 24 | (bytes[6] & 0xFF) << 16 | (bytes[5] & 0xFF) << 8 | (bytes[4] & 0xFF);
                         tv_usec = (bytes[11] & 0xFF) << 24 | (bytes[10] & 0xFF) << 16 | (bytes[9] & 0xFF) << 8 | (bytes[8] & 0xFF);
                         timestamp = tv_sec * 1000000000 + tv_usec * 1000;
-//                        Log.i(TAG, "timestamp = " + timestamp);
+                        Log.i(TAG, "timestamp = " + timestamp);
                         if (baseTimestamp == 0)
                             baseTimestamp = timestamp;
 
@@ -299,7 +350,7 @@ public class ParseDataActivity extends AppCompatActivity {
         String output_speed = "/sdcard/" + pathHolder.split(":")[1] + "_outspeed";
         String output_degree = "/sdcard/" + pathHolder.split(":")[1] + "_outdegree";
         FileOutputStream speedOutStream = null, degreeOutStream = null;
-        OutputStreamWriter speedWriter = null, degreeWriter = null;
+        OutputStreamWriter speedWriter = null, imuWriter = null;
 
         long base_timestamp = 0;
         int imu_count = 0;
@@ -310,7 +361,7 @@ public class ParseDataActivity extends AppCompatActivity {
             speedOutStream = new FileOutputStream(new File(output_speed));
             speedWriter = new OutputStreamWriter(speedOutStream);
             degreeOutStream = new FileOutputStream(new File(output_degree));
-            degreeWriter = new OutputStreamWriter(degreeOutStream);
+            imuWriter = new OutputStreamWriter(degreeOutStream);
 
             fr = new FileReader(filename);
             br = new BufferedReader(fr);
@@ -344,7 +395,7 @@ public class ParseDataActivity extends AppCompatActivity {
                 String strZ = String.format(Locale.getDefault(),"%.1f", (Math.toDegrees(fusedOrientation[2]) + 360) % 360);
                 String degreeStr = strX + " " + strY + " " + strZ + " " + measured_ts + "\n";
                 Log.i(TAG, "" + degreeStr);
-                degreeWriter.append(degreeStr);
+                imuWriter.append(degreeStr);
 
                 imu_count++;
 
@@ -358,7 +409,7 @@ public class ParseDataActivity extends AppCompatActivity {
             try {
                 if (br != null) { br.close(); }
                 if (speedWriter != null) { speedWriter.close(); }
-                if (degreeWriter != null) { degreeWriter.close(); }
+                if (imuWriter != null) { imuWriter.close(); }
                 if (speedOutStream != null) {
                     speedOutStream.flush();
                     speedOutStream.close();
@@ -392,10 +443,11 @@ public class ParseDataActivity extends AppCompatActivity {
 
         int last_imu_ts = 0;
         int imu_ts;
-        long tv_sec, tv_usec, timestamp;
+        long tv_sec, tv_usec, timestamp, rtp_timestamp;
         int timestamp_count = 0;
         long base_timestamp = 0;
         int imu_count = 0;
+        int samplerate = 90000;
 
         try {
             if (file.exists()) {
@@ -415,6 +467,9 @@ public class ParseDataActivity extends AppCompatActivity {
                         base_timestamp = timestamp;
                         timestamp_count += 1;
                         imu_count = 0;
+
+                        rtp_timestamp = (long) ((tv_sec * samplerate) % Math.pow(256.0, 4.0) + (tv_usec * (samplerate * 1.0e-6)));
+                        Log.i(TAG+"kiky", "rtp timestamp = " + rtp_timestamp);
                     } else {
                         String rawStr = getRawGyroInt(bytes[1], bytes[0]) + " "+
                                 getRawGyroInt(bytes[3], bytes[2]) + " " +
@@ -439,7 +494,7 @@ public class ParseDataActivity extends AppCompatActivity {
                         if (imu_ts == 0 || imu_ts - last_imu_ts < 3) {
                             last_imu_ts = imu_ts;
                         } else {
-                            Log.e(TAG, "IMU DATA TIMESTAMP ERROR!!! diff = " + (imu_ts - last_imu_ts));
+                            Log.e(TAG+"kiky", "IMU DATA TIMESTAMP ERROR!!! diff = " + (imu_ts - last_imu_ts));
                             break;
                         }
 
@@ -477,6 +532,149 @@ public class ParseDataActivity extends AppCompatActivity {
             } catch (IOException ignored) {
             }
         }
+    }
+
+    private void createIMUAndTSFile(String filename) {
+        Log.i(TAG, "createIMUAndTSFile: " + filename);
+        File file = new File(filename);
+
+        byte[] bytes = new byte[18];
+        int read = 0;
+//        float gyro_x, gyro_y, gyro_z, acc_x, acc_y, acc_z;
+        String output_ts = filename.replace(".txt", "_TSwithIMU.csv");
+        String output_imu = filename.replace(".txt", "_imu.csv");
+        FileOutputStream tsOutStream = null, imuOutStream = null;
+        OutputStreamWriter tsWriter = null, imuWriter = null;
+
+        int last_imu_ts = 0;
+        int imu_ts;
+        long tv_sec, tv_usec, start_rtp_timestamp = 0, end_rtp_timestamp = 0;
+        int imu_count = 0;
+        int total_imu_count = 0, total_ts_count = 0, total_ts_checked = 0;
+        int samplerate = 90000;
+        int tsListIndex = 0;
+        List<String> imuList = new ArrayList<String>();
+
+        try {
+            if (file.exists()) {
+                Log.i(TAG, "imu file lines should be: " + (file.length()/18));
+
+                tsOutStream = new FileOutputStream(new File(output_ts));
+                tsWriter = new OutputStreamWriter(tsOutStream);
+                imuOutStream = new FileOutputStream(new File(output_imu));
+                imuWriter = new OutputStreamWriter(imuOutStream);
+
+                is = new FileInputStream(file);
+                while((read = is.read(bytes)) != -1) {
+//                    Log.i(TAG, byteArrayToHex(bytes));
+                    if ((char)bytes[0] == 'T' && (char)bytes[1] == 'I' && (char)bytes[2] == 'M' && (char)bytes[3] == 'E') {
+                        tv_sec = (bytes[7] & 0xFF) << 24 | (bytes[6] & 0xFF) << 16 | (bytes[5] & 0xFF) << 8 | (bytes[4] & 0xFF);
+                        tv_usec = (bytes[11] & 0xFF) << 24 | (bytes[10] & 0xFF) << 16 | (bytes[9] & 0xFF) << 8 | (bytes[8] & 0xFF);
+
+                        if (start_rtp_timestamp == 0)
+                            start_rtp_timestamp = (long) ((tv_sec * samplerate) % Math.pow(256.0, 4.0) + (tv_usec * (samplerate * 1.0e-6)));
+                        else {
+                            end_rtp_timestamp = (long) ((tv_sec * samplerate) % Math.pow(256.0, 4.0) + (tv_usec * (samplerate * 1.0e-6)));
+
+                            long imuTickTime = (end_rtp_timestamp - start_rtp_timestamp) / imu_count;
+
+                            if (tsListIndex >= timestampList.size())
+                                continue;
+
+                            long ts = timestampList.get(tsListIndex);
+                            while (ts >= start_rtp_timestamp && ts <= end_rtp_timestamp) {
+                                int offset = (int) ((ts - start_rtp_timestamp) / imuTickTime);
+                                String ts_imu_str = String.valueOf(ts) + ", " + String.valueOf(imuList.get(offset));
+//                                Log.i(TAG+"kiky", "ts_imu_str = " + ts_imu_str);
+                                tsWriter.append(ts_imu_str);
+                                total_ts_checked ++;
+
+                                tsListIndex ++;
+                                if (tsListIndex >= timestampList.size())
+                                    break;
+
+                                ts = timestampList.get(tsListIndex);
+                            }
+
+                            start_rtp_timestamp = end_rtp_timestamp;
+                        }
+
+                        Log.i(TAG+"kiky", "rtp timestamp = " + start_rtp_timestamp);
+
+                        total_imu_count += imu_count;
+                        total_ts_count ++;
+                        imu_count = 0;
+                        imuList.clear();
+                    } else {
+//                        String rawStr = getRawGyroInt(bytes[1], bytes[0]) + " "+
+//                                getRawGyroInt(bytes[3], bytes[2]) + " " +
+//                                getRawGyroInt(bytes[5], bytes[4]) + "\n";
+//                        Log.i(TAG, "hextostring = " + rawStr);
+//                        tsWriter.append(rawStr);
+
+                        float[] gyro = new float[3];
+                        float[] acc = new float[3];
+                        gyro[0] = getGyro(bytes[1], bytes[0]);
+                        gyro[1] = getGyro(bytes[3], bytes[2]);
+                        gyro[2] = getGyro(bytes[5], bytes[4]);
+                        acc[0] = getAcc(bytes[7], bytes[6]);
+                        acc[1] = getAcc(bytes[9], bytes[8]);
+                        acc[2] = getAcc(bytes[11], bytes[10]);
+                        String imu_str = String.valueOf(gyro[0]) + ", " +
+                                        String.valueOf(gyro[1]) + ", " +
+                                        String.valueOf(gyro[2]) + ", " +
+                                        String.valueOf(acc[0]) + ", " +
+                                        String.valueOf(acc[1]) + ", " +
+                                        String.valueOf(acc[2]) + "\n";
+//                        Log.i(TAG, "measured_ts = " + measured_ts);
+                        if (imu_count == 0 && total_imu_count == 0)
+                            Log.i(TAG, "first imu data = " + imu_str);
+                        imu_count += 1;
+
+                        imu_ts = (bytes[13] & 0xFF) << 16 | (bytes[12] & 0xFF) << 8 | (bytes[15] & 0xFF);
+
+                        if (imu_ts == 0 || imu_ts - last_imu_ts < 3) {
+                            last_imu_ts = imu_ts;
+                        } else {
+                            Log.e(TAG+"kiky", "IMU DATA TIMESTAMP ERROR!!! diff = " + (imu_ts - last_imu_ts));
+                            break;
+                        }
+
+                        imuList.add(imu_str);
+                        imuWriter.append(imu_str);
+                    }
+                }
+            } else {
+                Log.e(TAG, "File not found: " + filename);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                if (is != null) {
+                    is.close();
+                }
+                if (tsWriter != null) { tsWriter.close(); }
+                if (imuWriter != null) { imuWriter.close(); }
+                if (tsOutStream != null) {
+                    tsOutStream.flush();
+                    tsOutStream.close();
+                }
+                if (imuOutStream != null) {
+                    imuOutStream.flush();
+                    imuOutStream.close();
+                }
+            } catch (IOException ignored) {
+            }
+        }
+        if (total_ts_checked == timestampList.size()) {
+            Log.i(TAG, "timestamp check PASS " + total_ts_checked + ":" + timestampList.size());
+        } else {
+            Log.i(TAG, "timestamp check FAILED " + total_ts_checked + ":" + timestampList.size());
+        }
+        Log.i(TAG+"kiky", "total imu count = " + total_imu_count +
+                                " total ts count = " + total_ts_count +
+                                " total data count = " + (total_imu_count + total_ts_count) + "\n\n");
     }
 
     private void getOrientation(float[] rotation, long timestamp) {
