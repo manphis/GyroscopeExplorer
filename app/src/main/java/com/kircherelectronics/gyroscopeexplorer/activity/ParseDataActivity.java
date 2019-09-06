@@ -17,6 +17,7 @@ import com.kircherelectronics.fsensor.filter.gyroscope.OrientationGyroscope;
 import com.kircherelectronics.fsensor.filter.gyroscope.fusion.complimentary.OrientationFusedComplimentary;
 import com.kircherelectronics.fsensor.filter.gyroscope.fusion.kalman.OrientationFusedKalman;
 import com.kircherelectronics.gyroscopeexplorer.R;
+import com.kircherelectronics.gyroscopeexplorer.task.ExtractVideoTask;
 
 import org.apache.commons.math3.complex.Quaternion;
 
@@ -196,6 +197,8 @@ public class ParseDataActivity extends AppCompatActivity {
                     imuFilePath = "/sdcard/" + pathHolder.split(":")[1];
                     imuFilePath = imuFilePath.replace(".mp4", ".txt");
                     createIMUAndTSFile(imuFilePath);
+
+                    extractVideoFile("/sdcard/" + pathHolder.split(":")[1]);
                 }
                 break;
         }
@@ -213,6 +216,18 @@ public class ParseDataActivity extends AppCompatActivity {
                 orientationKalmanFusion.reset();
                 break;
         }
+    }
+
+    private void extractVideoFile(String videoFilename) {
+        Log.i(TAG, "extractVideoFile: " + videoFilename);
+        String parentDir = new File(videoFilename).getParent();
+        File imageDir = new File(parentDir + File.separator + "image");
+
+        if (!imageDir.exists())
+            imageDir.mkdirs();
+
+        ExtractVideoTask task = new ExtractVideoTask(this, imageDir, timestampList);
+        task.execute(videoFilename);
     }
 
     private void readTimestamp(String filename) {
