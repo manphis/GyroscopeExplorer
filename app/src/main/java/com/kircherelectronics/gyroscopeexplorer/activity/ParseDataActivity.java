@@ -48,6 +48,7 @@ public class ParseDataActivity extends AppCompatActivity {
     private long baseTimestamp;
     private List<Float> timeDiff = new ArrayList<Float>();
     private List<Long> timestampList = new ArrayList<Long>();
+    private List<IMUData> imuDataList = new ArrayList<IMUData>();
 
     private Button parseBtn;
     private TextView filepathView;
@@ -541,11 +542,11 @@ public class ParseDataActivity extends AppCompatActivity {
         byte[] bytes = new byte[18];
         int read = 0;
 //        float gyro_x, gyro_y, gyro_z, acc_x, acc_y, acc_z;
-        String output_ts = filename.replace(".txt", "_TSwithIMU.csv");
         String output_imu = filename.replace(".txt", "_imu.csv");
-        FileOutputStream tsOutStream = null, imuOutStream = null;
-        OutputStreamWriter tsWriter = null, imuWriter = null;
+        FileOutputStream imuOutStream = null;
+        OutputStreamWriter imuWriter = null;
 
+        int file_lines = 0;
         int last_imu_ts = 0;
         int imu_ts;
         long tv_sec, tv_usec, start_rtp_timestamp = 0, end_rtp_timestamp = 0;
@@ -553,14 +554,15 @@ public class ParseDataActivity extends AppCompatActivity {
         int total_imu_count = 0, total_ts_count = 0, total_ts_checked = 0;
         int samplerate = 90000;
         int tsListIndex = 0;
-        List<String> imuList = new ArrayList<String>();
+        List<IMUData> imuList = new ArrayList<IMUData>();
+
+        imuDataList.clear();
 
         try {
             if (file.exists()) {
-                Log.i(TAG, "imu file lines should be: " + (file.length()/18));
+                file_lines = (int)(file.length()/18);
+                Log.i(TAG, "imu file lines should be: " + file_lines);
 
-                tsOutStream = new FileOutputStream(new File(output_ts));
-                tsWriter = new OutputStreamWriter(tsOutStream);
                 imuOutStream = new FileOutputStream(new File(output_imu));
                 imuWriter = new OutputStreamWriter(imuOutStream);
 
@@ -584,9 +586,10 @@ public class ParseDataActivity extends AppCompatActivity {
                             long ts = timestampList.get(tsListIndex);
                             while (ts >= start_rtp_timestamp && ts <= end_rtp_timestamp) {
                                 int offset = (int) ((ts - start_rtp_timestamp) / imuTickTime);
-                                String ts_imu_str = String.valueOf(ts) + ", " + String.valueOf(imuList.get(offset));
+                                imuList.get(offset).timestamp = ts;
+//                                String ts_imu_str = String.valueOf(ts) + ", " + String.valueOf(imuList.get(offset));
 //                                Log.i(TAG+"kiky", "ts_imu_str = " + ts_imu_str);
-                                tsWriter.append(ts_imu_str);
+//                                tsWriter.append(ts_imu_str);
                                 total_ts_checked ++;
 
                                 tsListIndex ++;
@@ -594,6 +597,14 @@ public class ParseDataActivity extends AppCompatActivity {
                                     break;
 
                                 ts = timestampList.get(tsListIndex);
+                            }
+
+                            // copy imuList to imuDataList
+                            for (int i = 0; i < imuList.size(); i++) {
+//                                imuDataList.add(imuList.get(i));
+                                IMUData imuData = imuList.get(i);
+                                String imu_str = String.valueOf(imuData.timestamp) + ", " + String.valueOf(imuData.imuString);
+                                imuWriter.append(imu_str);
                             }
 
                             start_rtp_timestamp = end_rtp_timestamp;
@@ -640,8 +651,7 @@ public class ParseDataActivity extends AppCompatActivity {
                             break;
                         }
 
-                        imuList.add(imu_str);
-                        imuWriter.append(imu_str);
+                        imuList.add(new IMUData(imu_str));
                     }
                 }
             } else {
@@ -654,12 +664,7 @@ public class ParseDataActivity extends AppCompatActivity {
                 if (is != null) {
                     is.close();
                 }
-                if (tsWriter != null) { tsWriter.close(); }
                 if (imuWriter != null) { imuWriter.close(); }
-                if (tsOutStream != null) {
-                    tsOutStream.flush();
-                    tsOutStream.close();
-                }
                 if (imuOutStream != null) {
                     imuOutStream.flush();
                     imuOutStream.close();
@@ -675,6 +680,8 @@ public class ParseDataActivity extends AppCompatActivity {
         Log.i(TAG+"kiky", "total imu count = " + total_imu_count +
                                 " total ts count = " + total_ts_count +
                                 " total data count = " + (total_imu_count + total_ts_count) + "\n\n");
+        if ((total_imu_count+total_ts_count) != file_lines)
+            Log.e(TAG, "parsing not match !!! file lines = " + file_lines + ", total data count = " + (total_imu_count+total_ts_count));
     }
 
     private void getOrientation(float[] rotation, long timestamp) {
@@ -791,4 +798,13 @@ public class ParseDataActivity extends AppCompatActivity {
             }
         }
     };
+
+    class IMUData{
+        public IMUData(String imuString) {
+            this.imuString = imuString;
+            this.timestamp = 0;
+        }
+        public long timestamp;
+        public String imuString;
+    }
 }
