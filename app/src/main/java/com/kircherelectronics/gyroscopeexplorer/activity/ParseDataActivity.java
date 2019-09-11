@@ -595,23 +595,24 @@ public class ParseDataActivity extends AppCompatActivity {
 
                             long imuTickTime = (end_rtp_timestamp - start_rtp_timestamp) / imu_count;
 
-                            if (tsListIndex >= timestampList.size())
-                                continue;
+                            if (tsListIndex < timestampList.size()) {
+//                                continue;
 
-                            long ts = timestampList.get(tsListIndex);
-                            while (ts >= start_rtp_timestamp && ts <= end_rtp_timestamp) {
-                                int offset = (int) ((ts - start_rtp_timestamp) / imuTickTime);
-                                imuList.get(offset).timestamp = ts;
+                                long ts = timestampList.get(tsListIndex);
+                                while (ts >= start_rtp_timestamp && ts <= end_rtp_timestamp) {
+                                    int offset = (int) ((ts - start_rtp_timestamp) / imuTickTime);
+                                    imuList.get(offset).timestamp = ts;
 //                                String ts_imu_str = String.valueOf(ts) + ", " + String.valueOf(imuList.get(offset));
 //                                Log.i(TAG+"kiky", "ts_imu_str = " + ts_imu_str);
 //                                tsWriter.append(ts_imu_str);
-                                total_ts_checked ++;
+                                    total_ts_checked++;
 
-                                tsListIndex ++;
-                                if (tsListIndex >= timestampList.size())
-                                    break;
+                                    tsListIndex++;
+                                    if (tsListIndex >= timestampList.size())
+                                        break;
 
-                                ts = timestampList.get(tsListIndex);
+                                    ts = timestampList.get(tsListIndex);
+                                }
                             }
 
                             // copy imuList to imuDataList
@@ -626,6 +627,7 @@ public class ParseDataActivity extends AppCompatActivity {
                         }
 
                         Log.i(TAG+"kiky", "rtp timestamp = " + start_rtp_timestamp);
+//                        Log.i(TAG+"kiky", "imu_count = " + imu_count);
 
                         total_imu_count += imu_count;
                         total_ts_count ++;
