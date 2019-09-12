@@ -8,6 +8,8 @@ import android.media.MediaFormat;
 import android.os.AsyncTask;
 import android.util.Log;
 
+import com.kircherelectronics.gyroscopeexplorer.activity.ParseDataActivity;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -24,12 +26,23 @@ public class ExtractVideoTask extends AsyncTask<String , Integer , Void> {
     private File outputFile = null;
     private List nameList;
     private long fileSize = 0;
+    private int index = 0;
+    private ParseDataActivity.TaskDelegate delegate = null;
 
     public ExtractVideoTask(Activity parentActivity, File output_file, List name_list) {
         super();
         this.parentActivity = parentActivity;
         this.outputFile = output_file;
         this.nameList = name_list;
+    }
+
+    public ExtractVideoTask(Activity parentActivity, File output_file, List name_list, int index, ParseDataActivity.TaskDelegate delegate) {
+        super();
+        this.parentActivity = parentActivity;
+        this.outputFile = output_file;
+        this.nameList = name_list;
+        this.index = index;
+        this.delegate = delegate;
     }
 
     @Override
@@ -49,7 +62,7 @@ public class ExtractVideoTask extends AsyncTask<String , Integer , Void> {
         barProgressDialog = new ProgressDialog(parentActivity);
 
         barProgressDialog.setTitle(DialogTitle);
-        barProgressDialog.setMessage(DialogMessage);
+        barProgressDialog.setMessage(DialogMessage + "Area_" + index);
         barProgressDialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
         barProgressDialog.setProgress(0);
         barProgressDialog.setMax(100);
@@ -60,6 +73,9 @@ public class ExtractVideoTask extends AsyncTask<String , Integer , Void> {
     @Override
     protected void onPostExecute(Void v) {
         barProgressDialog.dismiss();
+        if (null != delegate) {
+            delegate.taskCompletionResult(index);
+        }
         super.onPostExecute(v);
     }
 

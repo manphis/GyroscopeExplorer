@@ -130,15 +130,14 @@
         android:id="@+id/file_btn"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
-        android:layout_marginLeft="8dp"
+        android:layout_marginStart="50dp"
         android:layout_marginEnd="8dp"
-        android:layout_marginRight="8dp"
         android:layout_marginBottom="32dp"
         android:onClick="onClickView"
         android:text="choose file"
         app:layout_constraintBottom_toTopOf="@+id/parse_btn"
         app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.0"
         app:layout_constraintStart_toStartOf="parent" />
 
     <TextView
@@ -160,8 +159,7 @@
         android:id="@+id/parse_btn"
         android:layout_width="wrap_content"
         android:layout_height="48dp"
-        android:layout_marginStart="100dp"
-        android:layout_marginLeft="100dp"
+        android:layout_marginStart="50dp"
         android:layout_marginBottom="32dp"
         android:onClick="onClickView"
         android:text="parse imu"
@@ -181,6 +179,28 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.043"
         app:layout_constraintStart_toEndOf="@+id/parse_btn" />
+
+    <Button
+        android:id="@+id/folder_btn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="32dp"
+        android:layout_marginBottom="32dp"
+        android:text="choose folder"
+        android:onClick="onClickView"
+        app:layout_constraintBottom_toTopOf="@+id/parse_btn"
+        app:layout_constraintStart_toEndOf="@+id/file_btn" />
+
+    <Button
+        android:id="@+id/batch_parse_btn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:layout_marginBottom="32dp"
+        android:text="batch parse"
+        android:onClick="onClickView"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toEndOf="@+id/parse_mp4_btn" />
 
 
 </android.support.constraint.ConstraintLayout>

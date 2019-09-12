@@ -34,10 +34,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+import lib.folderpicker.FolderPicker;
+
 public class ParseDataActivity extends AppCompatActivity {
     private static final String TAG = ParseDataActivity.class.getSimpleName();
     private final static int WRITE_EXTERNAL_STORAGE_REQUEST = 1000;
     private final static int FILE_CHOOSE_CODE = 7;
+    private final static int FOLDERPICKER_CODE = 8;
+    private final static int MAX_INDEX = 16;
+    private static int folderIndex = 1;
 
 //    private String IMU_FILE = "/sdcard/ZZZ_q8h_Area_3_1562552173878.txt";
     private String IMU_FILE = "/sdcard/imu_rawdata_3";
@@ -93,6 +98,14 @@ public class ParseDataActivity extends AppCompatActivity {
     private double[] degree = new double[3];
     private static final float to_rps = 0.0174532925f;
 
+    private TaskDelegate delegate = new TaskDelegate() {
+        @Override
+        public void taskCompletionResult(int index) {
+            folderIndex = index + 1;
+            batchParse(pathHolder);
+        }
+    };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -141,6 +154,14 @@ public class ParseDataActivity extends AppCompatActivity {
                     filepathView.setText(pathHolder);
                 }
                 break;
+
+            case FOLDERPICKER_CODE:
+                if (resultCode == RESULT_OK) {
+                    pathHolder = data.getExtras().getString("data");
+                    Log.i( TAG, "Folder location: " + pathHolder );
+                    filepathView.setText(pathHolder);
+                }
+                break;
         }
     }
 
@@ -184,10 +205,14 @@ public class ParseDataActivity extends AppCompatActivity {
                 Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
                 intent.setType("*/*");
                 startActivityForResult(intent, FILE_CHOOSE_CODE);
+
+            case R.id.folder_btn:
+                Intent folder_intent = new Intent(this, FolderPicker.class);
+                startActivityForResult(folder_intent, FOLDERPICKER_CODE);
                 break;
 
             case R.id.parse_mp4_btn:
-                if (pathHolder.contains(".mp4")) {
+                if (null != pathHolder && pathHolder.contains(".mp4")) {
                     //read ts file
                     timestampFilePath = "/sdcard/" + pathHolder.split(":")[1];
                     timestampFilePath = timestampFilePath.replace(".mp4", ".ts");
@@ -199,6 +224,13 @@ public class ParseDataActivity extends AppCompatActivity {
                     createIMUAndTSFile(imuFilePath);
 
                     extractVideoFile("/sdcard/" + pathHolder.split(":")[1]);
+                }
+                break;
+
+            case R.id.batch_parse_btn:
+                if (null != pathHolder && new File(pathHolder).isDirectory()) {
+                    folderIndex = 16;
+                    batchParse(pathHolder);
                 }
                 break;
         }
@@ -218,6 +250,56 @@ public class ParseDataActivity extends AppCompatActivity {
         }
     }
 
+    private void batchParse(String rootFolder) {
+        String areaFolder = "";
+        areaFolder = rootFolder + File.separator + "Area_" + String.valueOf(folderIndex);
+
+        if (folderIndex == MAX_INDEX + 1) {
+            areaFolder = rootFolder + File.separator + "Area_free";
+        } else if (folderIndex > MAX_INDEX + 1) {
+            return;
+        }
+
+        String videoFile = getVideoFile(areaFolder);
+        while (!new File(areaFolder).exists() || null == videoFile) {
+            Log.i(TAG, "File NOT exist: " + areaFolder + "/" + videoFile);
+            folderIndex++;
+
+            areaFolder = rootFolder + File.separator + "Area_" + String.valueOf(folderIndex);
+            if (folderIndex == MAX_INDEX + 1) {
+                areaFolder = rootFolder + File.separator + "Area_free";
+            } else if (folderIndex > MAX_INDEX + 1) {
+                return;
+            }
+
+            videoFile = getVideoFile(areaFolder);
+        }
+        Log.i(TAG, "batchParse file = " + videoFile);
+
+
+        timestampFilePath = areaFolder + File.separator + videoFile.replace(".mp4", ".ts");
+        readTimestamp(timestampFilePath);
+        Log.i(TAG, "timestamp from " + timestampList.get(0) + " to " + timestampList.get(timestampList.size()-1) + "; length = " + timestampList.size());
+
+        imuFilePath = areaFolder + File.separator + videoFile.replace(".mp4", ".txt");
+        createIMUAndTSFile(imuFilePath);
+        extractVideoFile(areaFolder + File.separator + videoFile);
+    }
+
+    private String getVideoFile(String folder) {
+        Log.d(TAG, "Folder Name: " + folder);
+        String result = null;
+
+        File directory = new File(folder);
+        File[] files = directory.listFiles();
+        for (int i = 0; i < files.length; i++) {
+            if (files[i].getName().contains(".mp4") && files[i].getName().contains("q8h"))
+                result = files[i].getName();
+        }
+
+        return result;
+    }
+
     private void extractVideoFile(String videoFilename) {
         Log.i(TAG, "extractVideoFile: " + videoFilename);
         String parentDir = new File(videoFilename).getParent();
@@ -226,7 +308,7 @@ public class ParseDataActivity extends AppCompatActivity {
         if (!imageDir.exists())
             imageDir.mkdirs();
 
-        ExtractVideoTask task = new ExtractVideoTask(this, imageDir, timestampList);
+        ExtractVideoTask task = new ExtractVideoTask(this, imageDir, timestampList, folderIndex, delegate);
         task.execute(videoFilename);
     }
 
@@ -823,5 +905,9 @@ public class ParseDataActivity extends AppCompatActivity {
         }
         public long timestamp;
         public String imuString;
+    }
+
+    public interface TaskDelegate {
+        public void taskCompletionResult(int index);
     }
 }
