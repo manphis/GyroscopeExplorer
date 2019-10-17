@@ -229,7 +229,7 @@ public class ParseDataActivity extends AppCompatActivity {
 
             case R.id.batch_parse_btn:
                 if (null != pathHolder && new File(pathHolder).isDirectory()) {
-                    folderIndex = 16;
+                    folderIndex = 1;
                     batchParse(pathHolder);
                 }
                 break;
@@ -291,6 +291,9 @@ public class ParseDataActivity extends AppCompatActivity {
         String result = null;
 
         File directory = new File(folder);
+        if (!new File(folder).exists())
+            return null;
+
         File[] files = directory.listFiles();
         for (int i = 0; i < files.length; i++) {
             if (files[i].getName().contains(".mp4") && files[i].getName().contains("q8h"))
@@ -679,8 +682,16 @@ public class ParseDataActivity extends AppCompatActivity {
 
                             if (tsListIndex < timestampList.size()) {
 //                                continue;
-
                                 long ts = timestampList.get(tsListIndex);
+
+                                while (ts < start_rtp_timestamp) {
+                                    tsListIndex++;
+                                    if (tsListIndex >= timestampList.size())
+                                        break;
+
+                                    ts = timestampList.get(tsListIndex);
+                                }
+
                                 while (ts >= start_rtp_timestamp && ts <= end_rtp_timestamp) {
                                     int offset = (int) ((ts - start_rtp_timestamp) / imuTickTime);
                                     imuList.get(offset).timestamp = ts;
