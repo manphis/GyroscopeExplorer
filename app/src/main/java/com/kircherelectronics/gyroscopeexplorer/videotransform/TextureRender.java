@@ -52,14 +52,44 @@ class TextureRender {
             "  gl_Position = uMVPMatrix * aPosition;\n" +
             "  vTextureCoord = (uSTMatrix * aTextureCoord).xy;\n" +
             "}\n";
+//    private static final String FRAGMENT_SHADER =
+//            "#extension GL_OES_EGL_image_external : require\n" +
+//            "precision mediump float;\n" +      // highp here doesn't seem to matter
+//            "varying vec2 vTextureCoord;\n" +
+//            "uniform samplerExternalOES sTexture;\n" +
+//            "void main() {\n" +
+//            "  gl_FragColor = texture2D(sTexture, vTextureCoord);\n" +
+//            "}\n";
     private static final String FRAGMENT_SHADER =
             "#extension GL_OES_EGL_image_external : require\n" +
-            "precision mediump float;\n" +      // highp here doesn't seem to matter
-            "varying vec2 vTextureCoord;\n" +
-            "uniform samplerExternalOES sTexture;\n" +
-            "void main() {\n" +
-            "  gl_FragColor = texture2D(sTexture, vTextureCoord);\n" +
-            "}\n";
+                    "precision mediump float;\n" +
+                    "uniform samplerExternalOES u_Texture;\n" +
+                    "varying vec2 vTextureCoord;\n" +
+
+                    "void main() {\n" +
+                    "    vec3 irgb = texture2D(u_Texture, vTextureCoord).rgb;\n" +
+                    "    float ResS = 150.0;\n" +
+                    "    float ResT = 150.0;\n" +
+                    "    vec2 stp0 = vec2(1.0/ResS, 0.0);\n" +
+                    "    vec2 st0p = vec2(0.0, 1.0/ResT);\n" +
+                    "    vec2 stpp = vec2(1.0/ResS, 1.0/ResT);\n" +
+                    "    vec2 stpm = vec2(1.0/ResS, -1.0/ResT);\n" +
+                    "    vec3 i00 = texture2D(u_Texture, vTextureCoord).rgb;\n" +
+                    "    vec3 im1m1 = texture2D(u_Texture, vTextureCoord-stpp).rgb;\n" +
+                    "    vec3 ip1p1 = texture2D(u_Texture, vTextureCoord+stpp).rgb;\n" +
+                    "    vec3 im1p1 = texture2D(u_Texture, vTextureCoord-stpm).rgb;\n" +
+                    "    vec3 ip1m1 = texture2D(u_Texture, vTextureCoord+stpm).rgb;\n" +
+                    "    vec3 im10 = texture2D(u_Texture, vTextureCoord-stp0).rgb;\n" +
+                    "    vec3 ip10 = texture2D(u_Texture, vTextureCoord+stp0).rgb;\n" +
+                    "    vec3 i0m1 = texture2D(u_Texture, vTextureCoord-st0p).rgb;\n" +
+                    "    vec3 i0p1 = texture2D(u_Texture, vTextureCoord+st0p).rgb;\n" +
+                    "    vec3 target = vec3(0.0, 0.0, 0.0);\n" +
+                    "    target += 1.0*(im1m1+ip1m1+ip1p1+im1p1);\n" +
+                    "    target += 2.0*(im10+ip10+i0p1);\n" +
+                    "    target += 4.0*(i00);\n" +
+                    "    target /= 16.0;\n" +
+                    "    gl_FragColor = vec4(target, 1.0);\n" +
+                    "}\n";
     private float[] mMVPMatrix = new float[16];
     private float[] mSTMatrix = new float[16];
     private int mProgram;

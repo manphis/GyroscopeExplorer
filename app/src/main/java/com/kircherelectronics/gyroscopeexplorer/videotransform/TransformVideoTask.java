@@ -5,6 +5,7 @@ import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
+import android.media.MediaMuxer;
 import android.os.AsyncTask;
 import android.util.Log;
 
@@ -46,6 +47,7 @@ public class TransformVideoTask extends AsyncTask<String , Integer , Void> {
         OutputSurface outputSurface = null;
 
         MediaExtractor extractor = null;
+        MediaMuxer mediaMuxer = null;
 
         try {
             //========== Extractor ==========
@@ -71,7 +73,8 @@ public class TransformVideoTask extends AsyncTask<String , Integer , Void> {
                     inputFormat.getInteger(MediaFormat.KEY_HEIGHT));
 
             //========== Encoder ==========
-            MediaFormat outputFormat = MediaFormat.createVideoFormat(MIME_TYPE, VIDEO_WIDTH, VIDEO_HEIGHT);
+//            MediaFormat outputFormat = MediaFormat.createVideoFormat(MIME_TYPE, VIDEO_WIDTH, VIDEO_HEIGHT);
+            MediaFormat outputFormat = MediaFormat.createVideoFormat(MIME_TYPE, VIDEO_HEIGHT, VIDEO_WIDTH);     // eason: flip width/height for PnG selfie video
             outputFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT,
                     MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
 //            outputFormat.setInteger(MediaFormat.KEY_BIT_RATE,
@@ -104,27 +107,48 @@ public class TransformVideoTask extends AsyncTask<String , Integer , Void> {
             decoder.configure(inputFormat, outputSurface.getSurface(), null, 0);
             decoder.start();
 
-            doTransform(extractor, trackIndex, decoder, outputSurface, inputSurface, encoder);
+            //========== Muxer ==========
+            String output_filename = filename.replace(".mp4", "_blur.mp4");
+            mediaMuxer = new MediaMuxer(output_filename, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
+
+
+            doTransform(extractor, trackIndex, decoder, outputSurface, inputSurface, encoder, mediaMuxer);
+            Log.i(TAG, "transformation done");
         } finally {
             // release everything we grabbed
             if (outputSurface != null) {
                 outputSurface.release();
                 outputSurface = null;
             }
+            if (inputSurface != null) {
+                inputSurface.release();
+                inputSurface = null;
+            }
             if (decoder != null) {
                 decoder.stop();
                 decoder.release();
                 decoder = null;
             }
+            if (encoder != null) {
+                encoder.stop();
+                encoder.release();
+                encoder = null;
+            }
             if (extractor != null) {
                 extractor.release();
                 extractor = null;
+            }
+            if (mediaMuxer != null) {
+                mediaMuxer.stop();
+                mediaMuxer.release();
+                mediaMuxer = null;
             }
         }
     }
 
     private void doTransform(MediaExtractor extractor, int trackIndex, MediaCodec decoder,
-                           OutputSurface outputSurface, InputSurface inputSurface, MediaCodec encoder) throws IOException {
+                             OutputSurface outputSurface, InputSurface inputSurface, MediaCodec encoder,
+                             MediaMuxer muxer) throws IOException {
         final int TIMEOUT_USEC = 10000;
         ByteBuffer[] decoderInputBuffers = decoder.getInputBuffers();
         ByteBuffer[] encoderOutputBuffers = encoder.getOutputBuffers();
@@ -134,6 +158,8 @@ public class TransformVideoTask extends AsyncTask<String , Integer , Void> {
         boolean outputDone = false;
         boolean inputDone = false;
         boolean decoderDone = false;
+        int outputVideoTrackIndex = -1;
+
         while (!outputDone) {
             if (VERBOSE) Log.d(TAG, "edit loop");
             // Feed more data to the decoder.
@@ -187,6 +213,12 @@ public class TransformVideoTask extends AsyncTask<String , Integer , Void> {
                     if (VERBOSE) Log.d(TAG, "encoder output buffers changed");
                 } else if (encoderStatus == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
                     MediaFormat newFormat = encoder.getOutputFormat();
+
+                    Log.d(TAG, "encoder output resolution is " + newFormat.getInteger(MediaFormat.KEY_WIDTH) + "x" +
+                            newFormat.getInteger(MediaFormat.KEY_HEIGHT));
+                    outputVideoTrackIndex = muxer.addTrack(newFormat);
+                    muxer.start();
+
                     if (VERBOSE) Log.d(TAG, "encoder output format changed: " + newFormat);
                 } else if (encoderStatus < 0) {
                     Log.e(TAG, "unexpected result from encoder.dequeueOutputBuffer: " + encoderStatus);
@@ -201,8 +233,10 @@ public class TransformVideoTask extends AsyncTask<String , Integer , Void> {
                         encodedData.limit(info.offset + info.size);
                         //TODO: write to output mp4 file
 //                        outputData.addChunk(encodedData, info.flags, info.presentationTimeUs);
+                        muxer.writeSampleData(outputVideoTrackIndex, encodedData, info);
+
                         outputCount++;
-//                        if (VERBOSE)
+                        if (VERBOSE)
                             Log.d(TAG, "encoder output " + info.size + " bytes");
                     }
                     outputDone = (info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0;
@@ -227,6 +261,8 @@ public class TransformVideoTask extends AsyncTask<String , Integer , Void> {
                     } else if (decoderStatus == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
                         // expected before first buffer of data
                         MediaFormat newFormat = decoder.getOutputFormat();
+                        Log.d(TAG, "decoder output resolution is " + newFormat.getInteger(MediaFormat.KEY_WIDTH) + "x" +
+                                newFormat.getInteger(MediaFormat.KEY_HEIGHT));
                         if (VERBOSE) Log.d(TAG, "decoder output format changed: " + newFormat);
                     } else if (decoderStatus < 0) {
                         Log.e(TAG, "unexpected result from decoder.dequeueOutputBuffer: "+decoderStatus);
@@ -287,5 +323,15 @@ public class TransformVideoTask extends AsyncTask<String , Integer , Void> {
         }
 
         return -1;
+    }
+
+    private MediaFormat getDefaultVideoFormat() {
+        MediaFormat format = MediaFormat.createVideoFormat(MIME_TYPE, VIDEO_WIDTH, VIDEO_HEIGHT);
+        format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
+        //format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar);
+        format.setInteger(MediaFormat.KEY_BIT_RATE, 1*1000*1000);
+        format.setInteger(MediaFormat.KEY_FRAME_RATE, 15);
+        format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1);
+        return format;
     }
 }
