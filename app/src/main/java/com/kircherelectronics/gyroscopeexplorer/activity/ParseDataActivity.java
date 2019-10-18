@@ -18,6 +18,7 @@ import com.kircherelectronics.fsensor.filter.gyroscope.fusion.complimentary.Orie
 import com.kircherelectronics.fsensor.filter.gyroscope.fusion.kalman.OrientationFusedKalman;
 import com.kircherelectronics.gyroscopeexplorer.R;
 import com.kircherelectronics.gyroscopeexplorer.task.ExtractVideoTask;
+import com.kircherelectronics.gyroscopeexplorer.videotransform.TransformVideoTask;
 
 import org.apache.commons.math3.complex.Quaternion;
 
@@ -233,6 +234,12 @@ public class ParseDataActivity extends AppCompatActivity {
                     batchParse(pathHolder);
                 }
                 break;
+
+            case R.id.transform_btn:
+                if (null != pathHolder && pathHolder.contains(".mp4")) {
+                    transformVideoFile("/sdcard/" + pathHolder.split(":")[1]);
+                }
+                break;
         }
     }
 
@@ -301,6 +308,12 @@ public class ParseDataActivity extends AppCompatActivity {
         }
 
         return result;
+    }
+
+    private void transformVideoFile(String videoFilename) {
+        Log.i(TAG, "transformVideoFile: " + videoFilename);
+        TransformVideoTask task = new TransformVideoTask(this);
+        task.execute(videoFilename);
     }
 
     private void extractVideoFile(String videoFilename) {

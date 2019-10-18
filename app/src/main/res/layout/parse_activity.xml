@@ -202,5 +202,16 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toEndOf="@+id/parse_mp4_btn" />
 
+    <Button
+        android:id="@+id/transform_btn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginBottom="32dp"
+        android:text="Trans MP4"
+        android:onClick="onClickView"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toEndOf="@+id/batch_parse_btn" />
+
 
 </android.support.constraint.ConstraintLayout>

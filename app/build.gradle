@@ -6,7 +6,7 @@ android {
 
     defaultConfig {
         applicationId "com.kircherelectronics.com.gyroscopeexplorer"
-        minSdkVersion 17
+        minSdkVersion 18
         targetSdkVersion 28
         versionCode = 12
         versionName = "1.5.5"
