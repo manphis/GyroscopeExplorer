@@ -324,14 +324,4 @@ public class TransformVideoTask extends AsyncTask<String , Integer , Void> {
 
         return -1;
     }
-
-    private MediaFormat getDefaultVideoFormat() {
-        MediaFormat format = MediaFormat.createVideoFormat(MIME_TYPE, VIDEO_WIDTH, VIDEO_HEIGHT);
-        format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
-        //format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar);
-        format.setInteger(MediaFormat.KEY_BIT_RATE, 1*1000*1000);
-        format.setInteger(MediaFormat.KEY_FRAME_RATE, 15);
-        format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1);
-        return format;
-    }
 }
