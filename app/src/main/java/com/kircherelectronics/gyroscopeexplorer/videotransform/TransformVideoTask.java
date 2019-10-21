@@ -9,6 +9,8 @@ import android.media.MediaMuxer;
 import android.os.AsyncTask;
 import android.util.Log;
 
+import com.kircherelectronics.gyroscopeexplorer.R;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -98,6 +100,8 @@ public class TransformVideoTask extends AsyncTask<String , Integer , Void> {
 
             // Could use width/height from the MediaFormat to get full-size frames.
             outputSurface = new OutputSurface();
+            String frag_shader = TextResourceReader.readTextFileFromResource(parentActivity, R.raw.gaussian_5);
+            outputSurface.changeFragmentShader(frag_shader);
 
             // Create a MediaCodec decoder, and configure it with the MediaFormat from the
             // extractor.  It's very important to use the format from the extractor because
