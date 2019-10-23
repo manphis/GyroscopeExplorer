@@ -1,6 +1,7 @@
 package com.kircherelectronics.gyroscopeexplorer.videotransform;
 
 import android.app.Activity;
+import android.app.ProgressDialog;
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
 import android.media.MediaExtractor;
@@ -10,6 +11,7 @@ import android.os.AsyncTask;
 import android.util.Log;
 
 import com.kircherelectronics.gyroscopeexplorer.R;
+import com.kircherelectronics.gyroscopeexplorer.activity.ParseDataActivity;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -24,11 +26,20 @@ public class TransformVideoTask extends AsyncTask<String , Integer , Void> {
     private static final int VIDEO_WIDTH = 640;
     private static final int VIDEO_HEIGHT = 480;
 
+    private ProgressDialog barProgressDialog;
+    private final CharSequence DialogTitle = "Processing";
+    private final CharSequence DialogMessage = "blurring video...";
     private Activity parentActivity = null;
     private long inputFileSize = 0;
+    private int index = 0;
+    private String userName = null;
+    private ParseDataActivity.TaskDelegate delegate = null;
 
-    public TransformVideoTask(Activity parent_activity) {
-        parentActivity = parent_activity;
+    public TransformVideoTask(Activity parent_activity, String userName, int index, ParseDataActivity.TaskDelegate delegate) {
+        this.parentActivity = parent_activity;
+        this.index = index;
+        this.userName = userName;
+        this.delegate = delegate;
     }
 
     @Override
@@ -40,6 +51,40 @@ public class TransformVideoTask extends AsyncTask<String , Integer , Void> {
         }
 
         return null;
+    }
+
+    @Override
+    protected void onPreExecute() {
+        barProgressDialog = new ProgressDialog(parentActivity);
+
+        barProgressDialog.setTitle(DialogTitle);
+        String msg = null;
+        if (index <= 16)
+            msg = DialogMessage + " " + userName + ": Area_" + index;
+        else
+            msg = DialogMessage + " " + userName + ": Area_free";
+
+        barProgressDialog.setMessage(msg);
+        barProgressDialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
+        barProgressDialog.setProgress(0);
+        barProgressDialog.setMax(100);
+        barProgressDialog.show();
+        super.onPreExecute();
+    }
+
+    @Override
+    protected void onPostExecute(Void v) {
+        barProgressDialog.dismiss();
+        if (null != delegate) {
+            delegate.taskCompletionResult(index);
+        }
+        super.onPostExecute(v);
+    }
+
+    @Override
+    protected void onProgressUpdate(Integer... values) {
+        barProgressDialog.setProgress(values[0]);
+        super.onProgressUpdate(values);
     }
 
     private void transformFile(String filename) throws IOException {
@@ -163,6 +208,7 @@ public class TransformVideoTask extends AsyncTask<String , Integer , Void> {
         boolean inputDone = false;
         boolean decoderDone = false;
         int outputVideoTrackIndex = -1;
+        long extract_byte = 0;
 
         while (!outputDone) {
             if (VERBOSE) Log.d(TAG, "edit loop");
@@ -191,8 +237,8 @@ public class TransformVideoTask extends AsyncTask<String , Integer , Void> {
 //                        if (VERBOSE) Log.d(TAG, "submitted frame " + inputChunk + " to dec, size=" + chunkSize);
 //                        Log.i(TAG, "total extract = " + extract_byte);
 
-//                        extract_byte += chunkSize;
-//                        publishProgress((int) ((extract_byte / (float)fileSize) * 100));
+                        extract_byte += chunkSize;
+                        publishProgress((int) ((extract_byte / (float)inputFileSize) * 100));
 
                         inputChunk++;
                         extractor.advance();

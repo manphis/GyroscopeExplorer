@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
@@ -57,10 +58,10 @@ public class ParseDataActivity extends AppCompatActivity {
     private List<Long> timestampList = new ArrayList<Long>();
     private List<IMUData> imuDataList = new ArrayList<IMUData>();
 
-    private Button parseBtn;
-    private TextView filepathView;
+    private TextView filepathView, statusView;
     private String pathHolder = null;
-    private RadioGroup rateGroup, deviceGroup, dataGroup;
+    private String userName = null;
+    private boolean validUser = false;
 
     private enum Mode {
         GYROSCOPE_ONLY,
@@ -111,16 +112,10 @@ public class ParseDataActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        setContentView(R.layout.parse_activity);
+        setContentView(R.layout.video_transform_png);
 
-        parseBtn = (Button) findViewById(R.id.parse_btn);
         filepathView = (TextView) findViewById(R.id.path_tv);
-        rateGroup = (RadioGroup) findViewById(R.id.rate_rg);
-        deviceGroup = (RadioGroup) findViewById(R.id.device_rg);
-        dataGroup = (RadioGroup) findViewById(R.id.data_rg);
-        rateGroup.setOnCheckedChangeListener(radioListener);
-        deviceGroup.setOnCheckedChangeListener(radioListener);
-        dataGroup.setOnCheckedChangeListener(radioListener);
+        statusView = (TextView) findViewById(R.id.status_tv);
     }
 
     @Override
@@ -161,6 +156,20 @@ public class ParseDataActivity extends AppCompatActivity {
                     pathHolder = data.getExtras().getString("data");
                     Log.i( TAG, "Folder location: " + pathHolder );
                     filepathView.setText(pathHolder);
+
+                    String[] items = pathHolder.split("/");
+                    userName = items[items.length-1];
+                    String subDirName = items[items.length-2];
+                    String projectName = items[items.length-3];
+
+                    if (projectName.equals("QTubeAI") && subDirName.equals("Data")) {
+                        validUser = true;
+                        statusView.setText("HINT: Please click \"BLUR TRANSFORMATION\" to start transformation.");
+                    }
+                    else {
+                        validUser = false;
+                        statusView.setText("WARNING: Please select a valid folder of a user!");
+                    }
                 }
                 break;
         }
@@ -168,40 +177,6 @@ public class ParseDataActivity extends AppCompatActivity {
 
     public void onClickView(View v) {
         switch (v.getId()) {
-            case R.id.parse_btn:
-                new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-                        reset();
-                        Log.i(TAG, "start parsing; rate = " + rate.getValue() + "; device type = " + deviceType + "; data type = " + dataType);
-
-                        if (null != pathHolder) {
-                            IMU_FILE = "/sdcard/" + pathHolder.split(":")[1];
-
-                            switch (deviceType) {
-                                case Q8H:
-                                    getTimeInverval(IMU_FILE);
-                                    parseFile(IMU_FILE);
-                                    break;
-
-                                case INSULIN:
-                                    switch (dataType) {
-                                        case RAW_HEX:
-                                            parseRawHexFile(IMU_FILE);
-                                            break;
-
-                                        case RAW_INT:
-                                            parseRawData(IMU_FILE);
-                                            break;
-                                    }
-                                    break;
-                            }
-                        }
-                    }
-                }).start();
-
-                break;
-
             case R.id.file_btn:
                 Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
                 intent.setType("*/*");
@@ -236,8 +211,9 @@ public class ParseDataActivity extends AppCompatActivity {
                 break;
 
             case R.id.transform_btn:
-                if (null != pathHolder && pathHolder.contains(".mp4")) {
-                    transformVideoFile("/sdcard/" + pathHolder.split(":")[1]);
+                if (null != pathHolder && new File(pathHolder).isDirectory() && validUser) {
+                    folderIndex = 1;
+                    batchParse(pathHolder);
                 }
                 break;
         }
@@ -261,9 +237,13 @@ public class ParseDataActivity extends AppCompatActivity {
         String areaFolder = "";
         areaFolder = rootFolder + File.separator + "Area_" + String.valueOf(folderIndex);
 
+        statusView.setText("processing " + userName + ": Area_" + folderIndex);
+
         if (folderIndex == MAX_INDEX + 1) {
             areaFolder = rootFolder + File.separator + "Area_free";
+            statusView.setText("processing " + userName + ": Area_free");
         } else if (folderIndex > MAX_INDEX + 1) {
+            statusView.setText("processing " + userName + ": Completed");
             return;
         }
 
@@ -271,11 +251,14 @@ public class ParseDataActivity extends AppCompatActivity {
         while (!new File(areaFolder).exists() || null == videoFile) {
             Log.i(TAG, "File NOT exist: " + areaFolder + "/" + videoFile);
             folderIndex++;
+            statusView.setText("processing " + userName + ": Area_" + folderIndex);
 
             areaFolder = rootFolder + File.separator + "Area_" + String.valueOf(folderIndex);
             if (folderIndex == MAX_INDEX + 1) {
                 areaFolder = rootFolder + File.separator + "Area_free";
+                statusView.setText("processing " + userName + ": Area_free");
             } else if (folderIndex > MAX_INDEX + 1) {
+                statusView.setText("processing " + userName + ": Completed");
                 return;
             }
 
@@ -284,13 +267,15 @@ public class ParseDataActivity extends AppCompatActivity {
         Log.i(TAG, "batchParse file = " + videoFile);
 
 
-        timestampFilePath = areaFolder + File.separator + videoFile.replace(".mp4", ".ts");
-        readTimestamp(timestampFilePath);
-        Log.i(TAG, "timestamp from " + timestampList.get(0) + " to " + timestampList.get(timestampList.size()-1) + "; length = " + timestampList.size());
+//        timestampFilePath = areaFolder + File.separator + videoFile.replace(".mp4", ".ts");
+//        readTimestamp(timestampFilePath);
+//        Log.i(TAG, "timestamp from " + timestampList.get(0) + " to " + timestampList.get(timestampList.size()-1) + "; length = " + timestampList.size());
+//
+//        imuFilePath = areaFolder + File.separator + videoFile.replace(".mp4", ".txt");
+//        createIMUAndTSFile(imuFilePath);
+//        extractVideoFile(areaFolder + File.separator + videoFile);
 
-        imuFilePath = areaFolder + File.separator + videoFile.replace(".mp4", ".txt");
-        createIMUAndTSFile(imuFilePath);
-        extractVideoFile(areaFolder + File.separator + videoFile);
+        transformVideoFile(areaFolder + File.separator + videoFile);
     }
 
     private String getVideoFile(String folder) {
@@ -302,8 +287,9 @@ public class ParseDataActivity extends AppCompatActivity {
             return null;
 
         File[] files = directory.listFiles();
+        Arrays.sort(files);
         for (int i = 0; i < files.length; i++) {
-            if (files[i].getName().contains(".mp4") && files[i].getName().contains("q8h"))
+            if (files[i].getName().contains(".mp4") && files[i].getName().contains("_camera_"))
                 result = files[i].getName();
         }
 
@@ -312,7 +298,7 @@ public class ParseDataActivity extends AppCompatActivity {
 
     private void transformVideoFile(String videoFilename) {
         Log.i(TAG, "transformVideoFile: " + videoFilename);
-        TransformVideoTask task = new TransformVideoTask(this);
+        TransformVideoTask task = new TransformVideoTask(this, userName, folderIndex, delegate);
         task.execute(videoFilename);
     }
 
@@ -888,39 +874,6 @@ public class ParseDataActivity extends AppCompatActivity {
         return acc;
     }
 
-    RadioGroup.OnCheckedChangeListener radioListener = new RadioGroup.OnCheckedChangeListener() {
-        public void onCheckedChanged(RadioGroup group, int checkedId) {
-            switch(checkedId){
-                case R.id.radioButton1:
-                    rate = Rate.RATE1;
-                    break;
-                case R.id.radioButton2:
-                    rate = Rate.RATE2;
-                    break;
-                case R.id.radioButton3:
-                    rate = Rate.RATE3;
-                    break;
-
-
-                case R.id.radioButton4:
-                    deviceType = DeviceType.INSULIN;
-                    break;
-
-                case R.id.radioButton5:
-                    deviceType = DeviceType.Q8H;
-                    break;
-
-
-                case R.id.radioButton6:
-                    dataType = DataType.RAW_HEX;
-                    break;
-
-                case R.id.radioButton7:
-                    dataType = DataType.RAW_INT;
-                    break;
-            }
-        }
-    };
 
     class IMUData{
         public IMUData(String imuString) {

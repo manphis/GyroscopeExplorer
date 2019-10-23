@@ -1,12 +1,12 @@
-"#extension GL_OES_EGL_image_external : require
+#extension GL_OES_EGL_image_external : require
 precision mediump float;
 uniform samplerExternalOES u_Texture;
 varying vec2 vTextureCoord;
 
 void main() {
     vec3 irgb = texture2D(u_Texture, vTextureCoord).rgb;
-    float ResS = 150.0;
-    float ResT = 150.0;
+    float ResS = 120.0;
+    float ResT = 100.0;
     vec2 stp0 = vec2(1.0/ResS, 0.0);
     vec2 st0p = vec2(0.0, 1.0/ResT);
     vec2 stpp = vec2(1.0/ResS, 1.0/ResT);
